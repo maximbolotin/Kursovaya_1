@@ -36,7 +36,7 @@ int get_mac_address(const char *iface_name, unsigned char mac[6]) {
     strncpy(ifr.ifr_name, iface_name, IFNAMSIZ - 1);
     ifr.ifr_name[IFNAMSIZ - 1] = '\0';
 
-    // Запрашиваем  
+    // Запрашиваем MAC-адрес через ioctl
     if (ioctl(sock, SIOCGIFHWADDR, &ifr) < 0) {
         close(sock);
         return -1;
@@ -63,22 +63,22 @@ int main() {
     const char *selected_iface = NULL;
     int ip_family = 0; // AF_INET или AF_INET6
 
-    // 1. Получаем сетевое имя компьютера
+    // Получаем сетевое имя компьютера
     if (gethostname(hostname, sizeof(hostname)) != 0) {
         perror("Ошибка при получении имени хоста");
         return EXIT_FAILURE;
     }
 
-    // 2. Получаем список сетевых интерфейсов
+    // Получаем список сетевых интерфейсов
     if (getifaddrs(&ifaddrs_ptr) == -1) {
         perror("Ошибка при получении адресов интерфейсов");
         return EXIT_FAILURE;
     }
 
-    // 3. Проходим по списку интерфейсов
+    // Проходим по списку интерфейсов
     for (ifa = ifaddrs_ptr; ifa != NULL; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr == NULL) continue;
-
+        // Проверяем, что это IPv4 или IPv6
         if (ifa->ifa_addr->sa_family == AF_INET || ifa->ifa_addr->sa_family == AF_INET6) {
             if (is_loopback_address(ifa->ifa_addr)) {
                 continue;
@@ -90,9 +90,9 @@ int main() {
             } else { // AF_INET6
                 addr_ptr = &((struct sockaddr_in6*)ifa->ifa_addr)->sin6_addr;
             }
-
+            // Конвертируем бинарный адрес в строку
             if (inet_ntop(ifa->ifa_addr->sa_family, addr_ptr, ip_str, sizeof(ip_str)) != NULL) {
-                selected_iface = ifa->ifa_name;
+                selected_iface = ifa->ifa_name; // Сохраняем имя интерфейса для получения MAC-адреса
                 ip_family = ifa->ifa_addr->sa_family; // Сохраняем тип адреса
                 found = 1;
                 break; // Берем первый подходящий адрес
@@ -107,10 +107,10 @@ int main() {
         return EXIT_FAILURE;
     }
 
-    // 4. Пытаемся получить MAC-адрес для выбранного интерфейса
+    // Пытаемся получить MAC-адрес для выбранного интерфейса
     int mac_success = (get_mac_address(selected_iface, mac) == 0);
 
-    // 5. Выводим результаты
+    // Выводим результаты
     printf("Сетевое имя: %s\n", hostname);
     
     const char *ip_type = (ip_family == AF_INET) ? "IPv4" : "IPv6";
